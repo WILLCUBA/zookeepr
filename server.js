@@ -1,9 +1,15 @@
 const { query } = require('express')
 const express = require('express')
 const app = express()
+// parse incoming string to array data
+app.use(express.urlencoded({extended: true}))
+// parse incomig JSON data 
+app.use(express.json())
 const PORT = process.env.PORT || 3001;
 const port = 3001
 const {animals} = require('./data/animals.json')
+const fs = require('fs')
+const path = require('path')
 
 function filterByQuery(query, animalsArray) {
     let personalityTraitsArray = [];
@@ -53,7 +59,23 @@ function filterByQuery(query, animalsArray) {
     return filteredResults;
   }
 
-app.get('/api/animals', (req, res) => {
+function validateAnimal(animal) {
+  if (!animal.name || typeof animal.name !== 'string') {
+    return false;
+  }
+  if (!animal.species || typeof animal.species !== 'string') {
+    return false;
+  }
+  if (!animal.diet || typeof animal.diet !== 'string') {
+    return false;
+  }
+  if (!animal.personalityTraits || !Array.isArray(animal.personalityTraits)) {
+    return false;
+  }
+  return true;
+}
+
+  app.get('/api/animals', (req, res) => {
     let results = animals;
     if (req.query) {
       results = filterByQuery(req.query, results);
@@ -61,9 +83,22 @@ app.get('/api/animals', (req, res) => {
     res.json(results);
   });
 
-function findById(id,animalsArray) {
+  function findById(id,animalsArray) {
   const result = animalsArray.filter(animal => animal.id === id)[0]
   return result
+}
+
+function createNewAnimal(body, animalsArray) {
+  console.log(body);
+  const animal = body
+  animalsArray.push(animal)
+  // our function's main code will go here!
+  fs.writeFileSync(
+    path.join(__dirname, './data/animals.json'),
+    JSON.stringify({animals: animalsArray}, null, 2)
+  )
+  //return finished code to post rout for response
+  return animal
 }
 
 app.get('/api/animals/:id',(req,res) => {
@@ -73,6 +108,20 @@ app.get('/api/animals/:id',(req,res) => {
   } else res.send(404)  
   
 })
+
+app.post('/api/animals', (req,res) => {
+  // set id based on what next index of the array will be
+  req.body.id = animals.length.toString();
+  // if any data in req.body is incorrect send 400 error back
+  if(!validateAnimal(req.body)) {
+    res.status(400).send('The animal is not properly formatted');
+  } else {
+    const animal = createNewAnimal(req.body, animals);
+    res.json(animal);
+  }
+  // req.body is where our incoming content will be 
+  res.json(req.body)
+});
 
 app.listen(3001, ()=>{
     console.log(`API server now on port 3001`);
